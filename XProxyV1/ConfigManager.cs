@@ -50,7 +50,7 @@ namespace XProxyV1
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error Loading Redirects: {ex.Message}");
+                Console.WriteLine($"Error Loading Redirects: {ex.Message}");
                 return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             }
         }
@@ -63,11 +63,9 @@ namespace XProxyV1
                 
                 var defaultBlacklist = new List<string>
                 {
-                    "example-blocked.com",
-                    "malicious-site.net",
-                    "ad-tracker.com",
-                    "facebook.com",
-                    "twitter.com"
+                    "*.facebook.com",
+                    "*.ads.example.com",
+                    "test.example.org"
                 };
 
                 var json = JsonSerializer.Serialize(defaultBlacklist, new JsonSerializerOptions 
@@ -92,12 +90,9 @@ namespace XProxyV1
                 
                 var defaultRedirects = new Dictionary<string, string>
                 {
-                    { "google.de", "google.com" },
-                    { "www.google.de", "www.google.com" },
-                    { "youtube.de", "youtube.com" },
-                    { "www.youtube.de", "www.youtube.com" },
-                    { "amazon.de", "amazon.com" },
-                    { "www.amazon.de", "www.amazon.com" }
+                    { "*.google.de", "google.com" },
+                    { "test.example.org", "example.com" },
+                    { "*.test.example.de", "example.com" }
                 };
 
                 var json = JsonSerializer.Serialize(defaultRedirects, new JsonSerializerOptions 

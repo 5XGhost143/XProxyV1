@@ -89,6 +89,19 @@ namespace XProxyV1
             _listener?.Stop();
         }
 
+        private bool MatchesWildcard(string host, string pattern)
+        {
+            if (!pattern.StartsWith("*."))
+                return false;
+
+            var suffix = pattern.Substring(2);
+            
+            if (host.Equals(suffix, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return host.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase);
+        }
+
         private async Task<string> ApplyRedirectAsync(string host)
         {
             await _redirectsLock.WaitAsync();
@@ -96,7 +109,27 @@ namespace XProxyV1
             {
                 foreach (var redirect in _redirects)
                 {
-                    if (host.Equals(redirect.Key, StringComparison.OrdinalIgnoreCase))
+                    if (redirect.Key.StartsWith("*."))
+                    {
+                        if (MatchesWildcard(host, redirect.Key))
+                        {
+                            string redirectedHost;
+                            if (redirect.Value.StartsWith("*."))
+                            {
+                                var sourceSuffix = redirect.Key.Substring(2);
+                                var targetSuffix = redirect.Value.Substring(2);
+                                var prefix = host.Substring(0, host.Length - sourceSuffix.Length - 1);
+                                redirectedHost = prefix + "." + targetSuffix;
+                            }
+                            else
+                            {
+                                redirectedHost = redirect.Value;
+                            }
+                            SafePrint($"Redirect (wildcard): {host} -> {redirectedHost}");
+                            return redirectedHost;
+                        }
+                    }
+                    else if (host.Equals(redirect.Key, StringComparison.OrdinalIgnoreCase))
                     {
                         SafePrint($"Redirect: {host} -> {redirect.Value}");
                         return redirect.Value;
@@ -117,8 +150,14 @@ namespace XProxyV1
             {
                 foreach (var blocked in _blockedDomains)
                 {
-                    if (host.Equals(blocked, StringComparison.OrdinalIgnoreCase) ||
-                        host.EndsWith("." + blocked, StringComparison.OrdinalIgnoreCase))
+                    if (blocked.StartsWith("*."))
+                    {
+                        if (MatchesWildcard(host, blocked))
+                        {
+                            return true;
+                        }
+                    }
+                    else if (host.Equals(blocked, StringComparison.OrdinalIgnoreCase))
                     {
                         return true;
                     }
@@ -138,14 +177,14 @@ namespace XProxyV1
                 try
                 {
                     client.NoDelay = true;
-                    client.ReceiveBufferSize = 524288; // 512KB
-                    client.SendBufferSize = 524288; // 512KB
+                    client.ReceiveBufferSize = 524288;
+                    client.SendBufferSize = 524288;
                     
                     var stream = client.GetStream();
                     stream.ReadTimeout = 30000;
                     stream.WriteTimeout = 30000;
                     
-                    var buffer = ArrayPool<byte>.Shared.Rent(262144); // 256KB
+                    var buffer = ArrayPool<byte>.Shared.Rent(262144);
 
                     try
                     {
@@ -212,8 +251,8 @@ namespace XProxyV1
                 try
                 {
                     remoteClient.NoDelay = true;
-                    remoteClient.ReceiveBufferSize = 524288; // 512KB
-                    remoteClient.SendBufferSize = 524288; // 512KB
+                    remoteClient.ReceiveBufferSize = 524288;
+                    remoteClient.SendBufferSize = 524288;
 
                     await remoteClient.ConnectAsync(targetHost, targetPort);
                     var remoteStream = remoteClient.GetStream();
@@ -298,8 +337,8 @@ namespace XProxyV1
                 try
                 {
                     remoteClient.NoDelay = true;
-                    remoteClient.ReceiveBufferSize = 524288; // 512KB
-                    remoteClient.SendBufferSize = 524288; // 512KB
+                    remoteClient.ReceiveBufferSize = 524288;
+                    remoteClient.SendBufferSize = 524288;
 
                     await remoteClient.ConnectAsync(host, port);
                     var remoteStream = remoteClient.GetStream();
@@ -328,7 +367,7 @@ namespace XProxyV1
 
         private async Task ForwardDataAsync(NetworkStream source, NetworkStream destination, string direction)
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(262144); // 256KB buffer
+            var buffer = ArrayPool<byte>.Shared.Rent(262144);
             try
             {
                 int bytesRead;
@@ -340,7 +379,6 @@ namespace XProxyV1
             }
             catch
             {
-                // yeah connection closed prob
             }
             finally
             {
